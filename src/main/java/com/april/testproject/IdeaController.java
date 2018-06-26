@@ -1,12 +1,14 @@
 package com.april.testproject;
 
+import com.april.testproject.config.AppUserDetailsService;
 import com.april.testproject.dto.IdeaDto;
 import com.april.testproject.entity.Idea;
 import com.april.testproject.entity.Tag;
+import com.april.testproject.entity.User;
 import com.april.testproject.repository.IdeaRepository;
 import com.april.testproject.repository.LikeRepository;
 import com.april.testproject.repository.TagRepository;
-import org.hibernate.type.OrderedMapType;
+import com.april.testproject.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,12 +37,15 @@ public class IdeaController {
 	@Autowired
 	private LikeRepository likeRepository;
 
+	@Autowired
+	private UserRepository userRepository;
+
 	@Secured({ "ROLE_USER", "ROLE_ADMIN" })
 	@PostMapping(value = "idea", consumes = "application/json")
 	public Object createIdea(@RequestBody IdeaDto ideaDto) {
 		Idea idea = new Idea();
 		idea.setStatus(ideaDto.getStatus());
-		idea.setUserId(ideaDto.getUserId());
+		idea.setUserId(AppUserDetailsService.getUser().getId().toString());
 		idea.setHeader(ideaDto.getHeader());
 		idea.setMainPicture(ideaDto.getMainPicture());
 		idea.setShortDescription(ideaDto.getShortDescription());
@@ -48,6 +53,7 @@ public class IdeaController {
 		idea.setPictureList(ideaDto.getPictureList());
 		idea.setCreationDate(new Date());
 		idea.setPrice(ideaDto.getPrice());
+		idea.setRate(0);
 		Set<Tag> tags = getTags(ideaDto.getTags());
 		idea.setTags(tags);
 		ideaRepository.save(idea);
@@ -71,6 +77,8 @@ public class IdeaController {
 			Set<Tag> tags = getTags(ideaDto.getTags());
 			idea.setTags(tags);
 		}
+		int rate = likeRepository.getLikesOfIdea(id);
+		idea.setRate(rate);
 		ideaRepository.save(idea);
 		return idea;
 	}
@@ -114,6 +122,13 @@ public class IdeaController {
 	}
 
 	@Secured({ "ROLE_USER", "ROLE_ADMIN" })
+	@GetMapping(value = "getUserByIdeaId/{ideaId}", consumes = "application/json")
+	public User getUserByIdeaId(@PathVariable("ideaId") Long ideaId) {
+		Long userId = Long.parseLong(ideaRepository.findOne(ideaId).getUserId());
+		return userRepository.findOne(userId);
+	}
+
+	@Secured({ "ROLE_USER", "ROLE_ADMIN" })
 	@GetMapping(value = "getIdeasByHeader/{word}", consumes = "application/json")
 	public List<Idea> getIdeasByHeader(@PathVariable("word") String word) {
 		return ideaRepository.findInHeader(word);
@@ -149,18 +164,18 @@ public class IdeaController {
 		return tags;
 	}
 
-	List<Long> getIdeasSortedByLikesMethod(){
-		List<Long> likes = likeRepository.getLikedIdeas();
-		Map<Long, Integer> sortedIdeasMap = new TreeMap<>();
-		for (Long ideaId : likes){
-			sortedIdeasMap.putIfAbsent(ideaId, likeRepository.getLikesOfIdea(ideaId));
-		}
-		List<Long> sortedIdeasList = new ArrayList<>();
-		for (Map.Entry<Long,Integer> entry : sortedIdeasMap.entrySet()) {
-			sortedIdeasList.add(entry.getKey());
-		}
-		return sortedIdeasList;
-	}
+//	List<Long> getIdeasSortedByLikesMethod(){
+//		List<Long> likes = likeRepository.getLikedIdeas();
+//		Map<Long, Integer> sortedIdeasMap = new TreeMap<>();
+//		for (Long ideaId : likes){
+//			sortedIdeasMap.putIfAbsent(ideaId, likeRepository.getLikesOfIdea(ideaId));
+//		}
+//		List<Long> sortedIdeasList = new ArrayList<>();
+//		for (Map.Entry<Long,Integer> entry : sortedIdeasMap.entrySet()) {
+//			sortedIdeasList.add(entry.getKey());
+//		}
+//		return sortedIdeasList;
+//	}
 
 	// Doesn't work:
 //	Map<Long, Integer> newMap = new TreeMap<>();
